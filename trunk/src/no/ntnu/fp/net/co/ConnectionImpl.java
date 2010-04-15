@@ -94,10 +94,16 @@ public class ConnectionImpl extends AbstractConnection {
 			return;
 		}
 
-		// Send SYN
-		this.send("SYN");
+		KtnDatagram my_ktnpackage = this.constructInternalPacket(Flag.SYN);
+//this.sendAck(packetToAck, synAck)
+		this.sendDataPacketWithRetransmit(my_ktnpackage);
 		this.state = State.SYN_SENT;
-		Log.writeToLog("SYN sendt, state=SYN_SENDT", "connect()");
+
+		if (this.lastValidPacketReceived.getFlag() == Flag.SYN)
+			this.state = state.SYN_RCVD;
+			this.sendAck(this.lastValidPacketReceived, true);
+
+		//Log.writeToLog("SYN sendt, state=SYN_SENT", "connect()");
 		return;
 
 		// Start timer, wait for SYNACK
@@ -129,7 +135,9 @@ public class ConnectionImpl extends AbstractConnection {
 	 * @see no.ntnu.fp.net.co.Connection#send(String)
 	 */
 	public void send(String msg) throws ConnectException, IOException {
+
 		// if (State.ESTABLISHED != this.state) throw new ConnectException();
+		System.out.println("sender: " + msg);
 		this.constructDataPacket(msg);
 
 		// throw new NotImplementedException();
@@ -145,8 +153,14 @@ public class ConnectionImpl extends AbstractConnection {
 	 */
 	public String receive() throws ConnectException, IOException {
 
-		KtnDatagram ktnmessage = null;
-		String message = "???";
+		System.out.println("Recieve runs");
+		KtnDatagram ktnmessage = this.lastValidPacketReceived;
+
+		String message = ktnmessage.toString();
+
+		System.out.println(message);
+
+		// String message = "???";
 
 		if ("SYN" == message) {
 			this.state = State.SYN_RCVD;
