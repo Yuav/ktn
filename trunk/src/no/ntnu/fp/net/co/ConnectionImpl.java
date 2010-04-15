@@ -147,7 +147,7 @@ public class ConnectionImpl extends AbstractConnection {
         if (State.SYN_SENT == this.state) {
         	//if (message == SYNACK) this.send(ACK)
         	this.state = State.ESTABLISHED;
-        		KtnDatagram.
+        		//KtnDatagram.
         	return "message";
         }
     	throw new NotImplementedException();
