@@ -39,6 +39,8 @@ public class ConnectionImpl extends AbstractConnection {
     /** Keeps track of the used ports for each server port. */
     private static Map<Integer, Boolean> usedPorts = Collections.synchronizedMap(new HashMap<Integer, Boolean>());
 
+    //Dirty hack
+    private InetAddress myInetAddress;
     /**
      * Initialise initial sequence number and setup state machine.
      * 
@@ -77,7 +79,31 @@ public class ConnectionImpl extends AbstractConnection {
      */
     public void connect(InetAddress remoteAddress, int remotePort) throws IOException,
             SocketTimeoutException {
-        throw new NotImplementedException();
+    	
+    	this.remoteAddress = remoteAddress.getHostAddress();
+    	Log.writeToLog("Setting remote address to:" + this.remoteAddress, "connect()");
+    	this.remotePort = remotePort;
+    	Log.writeToLog("Setting remote port to: " + remotePort, "connect()");
+    	
+    	//Check if we're connected already
+    	if (state.ESTABLISHED == this.state) {
+    		Log.writeToLog("Already connected!", "connect()");
+    		return;
+    	}
+    	
+    	//Send SYN
+    	this.send("SYN");
+    	this.state = State.SYN_SENT;
+    	Log.writeToLog("SYN sendt, state=SYN_SENDT", "connect()");
+    	return;
+
+
+    	// Start timer, wait for SYNACK
+    	//howto?
+    	
+    	
+    	
+        //throw new NotImplementedException();
     }
 
     /**
@@ -103,7 +129,10 @@ public class ConnectionImpl extends AbstractConnection {
      * @see no.ntnu.fp.net.co.Connection#send(String)
      */
     public void send(String msg) throws ConnectException, IOException {
-        throw new NotImplementedException();
+    	if (State.ESTABLISHED != this.state) throw new ConnectException();
+    	this.constructDataPacket(msg);
+    	
+    	//throw new NotImplementedException();
     }
 
     /**
@@ -115,7 +144,13 @@ public class ConnectionImpl extends AbstractConnection {
      * @see AbstractConnection#sendAck(KtnDatagram, boolean)
      */
     public String receive() throws ConnectException, IOException {
-        throw new NotImplementedException();
+        if (State.SYN_SENT == this.state) {
+        	//if (message == SYNACK) this.send(ACK)
+        	this.state = State.ESTABLISHED;
+        		KtnDatagram.
+        	return "message";
+        }
+    	throw new NotImplementedException();
     }
 
     /**
