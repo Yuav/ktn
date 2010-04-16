@@ -16,6 +16,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.sun.xml.internal.ws.api.message.Packet;
+
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import no.ntnu.fp.net.admin.Log;
@@ -88,33 +90,35 @@ public class ConnectionImpl extends AbstractConnection {
 			return;
 		}
 		
-		// Send SYN to initate connect
+		// Send SYN to initiate connect
 		KtnDatagram packet = this.constructInternalPacket(Flag.SYN);
 		packet.setDest_addr(this.remoteAddress);
 		packet.setDest_port(this.remotePort);
-		packet.setPayload("dummy");
+		//packet.setPayload("dummy");
 		
-		ClSocket clsocket = new ClSocket();
- 		try {
- 			clsocket.send(packet);		//Send the packet
- 		}
- 		catch (Exception e) {
+		try {
+			this.simplySendPacket(packet);	
+		} catch (Exception e) {
+			System.out.println("connect() error: " + e.getMessage());
 			// TODO: handle exception
- 			
- 			System.out.println("connect() error: " + e.getMessage());		
- 			}
+		}
+		
 		this.state = State.SYN_SENT;
 		
 		// Look for SYNACK
-		ClSocket socket = new ClSocket();
-		KtnDatagram rcv_packet = socket.receive(this.myPort);
-		System.out.println(rcv_packet.getPayload().toString());
+		KtnDatagram rcv_packet = this.receiveAck();
+		if (rcv_packet.getFlag() != Flag.SYN_ACK) throw new IOException("No SYN_ACK recieved");
+		
+		
+		System.out.println(rcv_packet.toString());
+		
+		System.out.println("connect() RCV: " + rcv_packet.getPayload().toString());
 		
 		if (this.lastValidPacketReceived.getFlag() == Flag.SYN)
 			this.state = state.SYN_RCVD;
 			this.sendAck(this.lastValidPacketReceived, true);
 
-		//Log.writeToLog("SYN sendt, state=SYN_SENT", "connect()");
+		//Log.writeToLog("SYN sent, state=SYN_SENT", "connect()");
 		return;
 
 		// Start timer, wait for SYNACK
@@ -130,6 +134,7 @@ public class ConnectionImpl extends AbstractConnection {
 	 * @see Connection#accept()
 	 */
 	public Connection accept() throws IOException, SocketTimeoutException {
+		
 		throw new NotImplementedException();
 	}
 
@@ -149,24 +154,17 @@ public class ConnectionImpl extends AbstractConnection {
 
 		// if (State.ESTABLISHED != this.state) throw new ConnectException();
 		System.out.println("sender: " + msg);
+
+
 		this.constructDataPacket(msg);
 		
-		// throw new NotImplementedException();
-	}
-		//send pakke
-		KtnDatagram packet = this.constructInternalPacket(Flag.SYN);
+
+		KtnDatagram packet = this.constructInternalPacket(null);
 		packet.setDest_addr(this.remoteAddress);
 		packet.setDest_port(this.remotePort);
-		packet.setPayload("dummy");
 		
-		ClSocket clSocket=new ClSocket();
-		try{
-			clSocket.send(packet);
-		}
-		catch (Exception e){
-			
-			
-		}
+	}
+
 		
 	/**
 	 * Wait for incoming data.
@@ -179,39 +177,9 @@ public class ConnectionImpl extends AbstractConnection {
 	public String receive() throws ConnectException, IOException {
 
 		System.out.println("Recieve runs");
-		KtnDatagram ktnmessage = null;
-		// motta pakke	
-		ClSocket clSocket = new ClSocket();
-		KtnDatagram packet;
-		packet = clSocket.receive();
-			
-		String message = ktnmessage.toString();
-
-		System.out.println(message);
-
-		// String message = "???";
-
-		if ("SYN" == message) {
-			this.state = State.SYN_RCVD;
-		}
-
-		switch (this.state) {
-		case SYN_SENT:
-			if ("SYNACK" == message) {
-				sendAck(ktnmessage, true);
-				this.state = State.ESTABLISHED;
-			} else
-				throw new IOException();
-			break;
-		case SYN_RCVD:
-			sendAck(ktnmessage, false);
-			break;
-
-		default:
-			sendAck(ktnmessage, false);
-			return message;
-		}
-		throw new IOException();
+		
+		//TODO Check if valid before returning
+		return (String)this.receivePacket(true).getPayload();
 
 	}
 
@@ -255,4 +223,6 @@ public class ConnectionImpl extends AbstractConnection {
 		
 		return valid;
 	}
+
+	
 }
