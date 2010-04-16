@@ -1,0 +1,11 @@
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Timestamp        Logging Entity           Source                   Destination              Seq No  Flag    Ack No  Start Payload            Checksum    Comment                                           
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+11:46:3.458      ConnectionImpl(int)                                                                                                                     Setting port: 5555                                
+11:46:3.485      getIPv4Address()                                                                                                                        Setting IP: 129.241.107.131                       
+11:46:3.635      NETWORK                                                                                                                                 Packet 6531 send!                                 
+11:46:3.642      AbstractConnection                                                                                                                      Waiting for incoming packet in doReceive()        
+11:46:3.649      CLSocket::receive                                                                                                                       Receiving at:5555                                 
+11:46:3.656      ClSocketReceiver                                                                                                                        Exception while receiving: Address already in use: JVM_Bind
