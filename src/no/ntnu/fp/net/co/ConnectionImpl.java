@@ -15,6 +15,7 @@ import java.net.UnknownHostException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Stack;
 
 import com.sun.xml.internal.ws.api.message.Packet;
 
@@ -48,8 +49,8 @@ public class ConnectionImpl extends AbstractConnection {
 	/**
 	 * Initialise initial sequence number and setup state machine.
 	 * 
-	 * @param myPort
-	 *            - the local port to associate with this connection
+	 * @param myPort -
+	 *            the local port to associate with this connection
 	 */
 	public ConnectionImpl(int myPort) {
 		super();
@@ -70,10 +71,10 @@ public class ConnectionImpl extends AbstractConnection {
 	/**
 	 * Establish a connection to a remote location.
 	 * 
-	 * @param remoteAddress
-	 *            - the remote IP-address to connect to
-	 * @param remotePort
-	 *            - the remote portnumber to connect to If there's an I/O error.
+	 * @param remoteAddress -
+	 *            the remote IP-address to connect to
+	 * @param remotePort -
+	 *            the remote portnumber to connect to If there's an I/O error.
 	 * @throws java.net.SocketTimeoutException
 	 *             If timeout expires before connection is completed.
 	 * @see Connection#connect(InetAddress, int)
@@ -81,45 +82,49 @@ public class ConnectionImpl extends AbstractConnection {
 	public void connect(InetAddress remoteAddress, int remotePort)
 			throws IOException, SocketTimeoutException {
 
-		 this.remoteAddress = remoteAddress.getHostAddress();
-		 this.remotePort = remotePort;
-		
+		this.remoteAddress = remoteAddress.getHostAddress();
+		this.remotePort = remotePort;
+
 		// Check if we're connected already
 		if (state.ESTABLISHED == this.state) {
 			Log.writeToLog("Already connected!", "connect()");
 			return;
 		}
-		
+
 		// Send SYN to initiate connect
 		KtnDatagram packet = this.constructInternalPacket(Flag.SYN);
 		packet.setDest_addr(this.remoteAddress);
 		packet.setDest_port(this.remotePort);
-		//packet.setPayload("dummy");
-		
+		// packet.setPayload("dummy");
+
 		try {
-			this.simplySendPacket(packet);	
+			this.simplySendPacket(packet);
 		} catch (Exception e) {
-			System.out.println("connect() error: " + e.getMessage());
-			// TODO: handle exception
+			throw new IOException(e.getMessage());
+			// System.out.println("connect() error: " + e.getMessage());
 		}
-		
+
 		this.state = State.SYN_SENT;
-		
+
 		// Look for SYNACK
 		KtnDatagram rcv_packet = this.receiveAck();
-		
-		if (rcv_packet.getFlag() != Flag.SYN_ACK) throw new IOException("No SYN_ACK recieved");
-		
-		
+
+		System.out.println("connect_rcv: ");
+		System.out.println(rcv_packet);
+
+		if (rcv_packet.getFlag() != Flag.SYN_ACK)
+			throw new IOException("No SYN_ACK recieved");
+
 		System.out.println(rcv_packet.toString());
-		
-		System.out.println("connect() RCV: " + rcv_packet.getPayload().toString());
-		
+
+		System.out.println("connect() RCV: "
+				+ rcv_packet.getPayload().toString());
+
 		if (this.lastValidPacketReceived.getFlag() == Flag.SYN)
 			this.state = state.SYN_RCVD;
-			this.sendAck(this.lastValidPacketReceived, true);
+		this.sendAck(this.lastValidPacketReceived, true);
 
-		//Log.writeToLog("SYN sent, state=SYN_SENT", "connect()");
+		// Log.writeToLog("SYN sent, state=SYN_SENT", "connect()");
 		return;
 
 		// Start timer, wait for SYNACK
@@ -136,14 +141,43 @@ public class ConnectionImpl extends AbstractConnection {
 	 */
 	public Connection accept() throws IOException, SocketTimeoutException {
 		
-		throw new NotImplementedException();
+		System.out.println("accept()");
+		System.out.println(this.lastValidPacketReceived);
+		
+		
+		
+		this.state = State.LISTEN;
+		KtnDatagram packet = this.receivePacket(false);
+		//System.out.println("server: " + packet);
+		
+		
+		
+		
+		this.remoteAddress = packet.getSrc_addr();
+		this.remotePort = packet.getSrc_port();
+		
+		
+		
+		KtnDatagram synack = new KtnDatagram();
+		synack.setFlag(Flag.SYN_ACK);
+		synack.setDest_addr(this.remoteAddress);
+		synack.setDest_port(this.remotePort);
+		
+		System.out.println(synack);
+		this.sendAck(synack, true);
+		
+		
+		
+		
+		return this;
+
 	}
 
 	/**
 	 * Send a message from the application.
 	 * 
-	 * @param msg
-	 *            - the String to be sent.
+	 * @param msg -
+	 *            the String to be sent.
 	 * @throws ConnectException
 	 *             If no connection exists.
 	 * @throws IOException
@@ -156,17 +190,14 @@ public class ConnectionImpl extends AbstractConnection {
 		// if (State.ESTABLISHED != this.state) throw new ConnectException();
 		System.out.println("sender: " + msg);
 
-
 		this.constructDataPacket(msg);
-		
 
 		KtnDatagram packet = this.constructInternalPacket(null);
 		packet.setDest_addr(this.remoteAddress);
 		packet.setDest_port(this.remotePort);
-		
+
 	}
 
-		
 	/**
 	 * Wait for incoming data.
 	 * 
@@ -178,9 +209,9 @@ public class ConnectionImpl extends AbstractConnection {
 	public String receive() throws ConnectException, IOException {
 
 		System.out.println("Recieve runs");
-		
-		//TODO Check if valid before returning
-		return (String)this.receivePacket(true).getPayload();
+
+		// TODO Check if valid before returning
+		return (String) this.receivePacket(true).getPayload();
 
 	}
 
@@ -204,26 +235,32 @@ public class ConnectionImpl extends AbstractConnection {
 	protected boolean isValid(KtnDatagram packet) {
 		boolean valid = true;
 		// Sjekker om checksum er korrekt
-		if (packet.getChecksum() != packet.calculateChecksum()) valid = false;
-		
+		if (packet.getChecksum() != packet.calculateChecksum())
+			valid = false;
+
 		// Sjekker om pakken kommer fra rett IP
-		if (packet.getSrc_addr().equals(this.remoteAddress)) valid = false;
-		
+		if (packet.getSrc_addr().equals(this.remoteAddress))
+			valid = false;
+
 		// Sjekker om pakken kommer fra rett port
-		if (packet.getSrc_port() != this.remotePort) valid = false;
-		
+		if (packet.getSrc_port() != this.remotePort)
+			valid = false;
+
 		// Sjekker om pakken har rett flagg
-		if (!(packet.getFlag() == Flag.NONE || packet.getFlag() == Flag.ACK)) valid = false;
-		
+		if (!(packet.getFlag() == Flag.NONE || packet.getFlag() == Flag.ACK))
+			valid = false;
+
 		// Sjekker om pakken har rett sekvensnr.
-		if (packet.getSeq_nr() != (lastValidPacketReceived.getSeq_nr()+1)) valid = false;
-		
+		if (packet.getSeq_nr() != (lastValidPacketReceived.getSeq_nr() + 1))
+			valid = false;
+
 		// Skriver til log
-		if(valid) Log.writeToLog(packet, "Valid package", "isValid(KtnDatagram)");
-		else Log.writeToLog(packet, "Invalid package", "isValid(KtnDatagram");
-		
+		if (valid)
+			Log.writeToLog(packet, "Valid package", "isValid(KtnDatagram)");
+		else
+			Log.writeToLog(packet, "Invalid package", "isValid(KtnDatagram");
+
 		return valid;
 	}
 
-	
 }
