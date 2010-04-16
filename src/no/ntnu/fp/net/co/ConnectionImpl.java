@@ -150,10 +150,18 @@ public class ConnectionImpl extends AbstractConnection {
 		// if (State.ESTABLISHED != this.state) throw new ConnectException();
 		System.out.println("sender: " + msg);
 		this.constructDataPacket(msg);
-
+		
 		// throw new NotImplementedException();
 	}
-
+		//send pakke
+		ClSocket clSocket=new ClSocket();
+		try{
+			clSocket.send(packet);
+		}
+		catch (Exception e){
+			
+			
+		}
 	/**
 	 * Wait for incoming data.
 	 * 
@@ -166,9 +174,11 @@ public class ConnectionImpl extends AbstractConnection {
 
 		System.out.println("Recieve runs");
 		KtnDatagram ktnmessage = null;
-
-		
-		
+		// motta pakke	
+		ClSocket clSocket = new ClSocket();
+		KtnDatagram packet;
+		packet = clSocket.receive();
+			
 		String message = ktnmessage.toString();
 
 		System.out.println(message);
