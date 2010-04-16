@@ -106,15 +106,28 @@ public class ConnectionImpl extends AbstractConnection {
 		this.state = State.SYN_SENT;
 
 		// Look for SYNACK
-		while ((null == packet) || (packet.getFlag() != Flag.SYN_ACK)) {
-			packet = this.receiveAck();
-		}
+		packet = this.receiveAck();
+
+		// while ((null == packet) || (packet.getFlag() != Flag.SYN_ACK)) {
+		//	
+		// }
 		// Have SYNACK, send ACK
-		this.remoteAddress = packet.getSrc_addr();
-		this.remotePort = packet.getSrc_port();
-		this.sendAck(packet, false);
+
+		int myport = (int) (50000 + 1000 * Math.random());
+		while (this.usedPorts.containsKey(myport))
+			myport = (int) (50000 + 1000 * Math.random());
+
+		// this.usedPorts.keySet(myport,true);
+		this.usedPorts.put(myport, true);
+
+		ConnectionImpl connection = new ConnectionImpl(myport);
+		connection.remoteAddress = packet.getSrc_addr();
+		connection.remotePort = packet.getSrc_port();
+		connection.usedPorts = this.usedPorts;
+		connection.sendAck(packet, false);
 
 		this.state = State.ESTABLISHED;
+		System.out.println("connect() SUCCESS!");
 	}
 
 	/**
@@ -143,24 +156,26 @@ public class ConnectionImpl extends AbstractConnection {
 		this.remoteAddress = packet.getSrc_addr();
 		this.remotePort = packet.getSrc_port();
 
-		int myport = 50000;
+		int myport = (int) (50000 + 1000 * Math.random());
 		while (this.usedPorts.containsKey(myport))
 			myport = (int) (50000 + 1000 * Math.random());
 
-		this.usedPorts.keySet(myport,true);
-		
-		
+		// this.usedPorts.keySet(myport,true);
+		this.usedPorts.put(myport, true);
+
 		ConnectionImpl connection = new ConnectionImpl(myport);
 		connection.remoteAddress = packet.getSrc_addr();
 		connection.remotePort = packet.getSrc_port();
 		connection.usedPorts = this.usedPorts;
+		// Send SYN_ACK
 		connection.sendAck(packet, true);
 
 		// Wait for ACK
-		while (null == packet || (packet.getFlag() != Flag.ACK)) {
-			packet = this.receiveAck();
-		}
+		packet = this.receiveAck();
+		// while (null == packet || (packet.getFlag() != Flag.ACK)) {
+		// }
 
+		System.out.println("accept COOOOONNNECTED!");
 		this.state = State.ESTABLISHED;
 
 		return connection;
@@ -181,14 +196,15 @@ public class ConnectionImpl extends AbstractConnection {
 	 */
 	public void send(String msg) throws ConnectException, IOException {
 
-		// if (State.ESTABLISHED != this.state) throw new ConnectException();
+		if (State.ESTABLISHED != this.state)
+			throw new ConnectException();
 		System.out.println("sender: " + msg);
 
-		this.constructDataPacket(msg);
-
-		KtnDatagram packet = this.constructInternalPacket(null);
+		KtnDatagram packet = this.constructDataPacket(msg);
 		packet.setDest_addr(this.remoteAddress);
 		packet.setDest_port(this.remotePort);
+
+		this.sendDataPacketWithRetransmit(packet);
 
 	}
 
@@ -202,11 +218,16 @@ public class ConnectionImpl extends AbstractConnection {
 	 */
 	public String receive() throws ConnectException, IOException {
 
-		System.out.println("Recieve runs");
-
+		KtnDatagram packet = null;
+		while (null == packet) {
+			packet = this.receivePacket(false);
+		}
 		// TODO Check if valid before returning
-		return (String) this.receivePacket(true).getPayload();
+		this.sendAck(packet, false);
 
+		System.out.println("Recieve() got: "+packet.getPayload().toString());
+		
+		return packet.getPayload().toString();
 	}
 
 	/**
