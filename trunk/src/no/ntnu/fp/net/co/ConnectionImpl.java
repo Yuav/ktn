@@ -15,6 +15,7 @@ import java.net.UnknownHostException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 import java.util.Stack;
 
 import com.sun.xml.internal.ws.api.message.Packet;
@@ -93,9 +94,7 @@ public class ConnectionImpl extends AbstractConnection {
 
 		// Send SYN to initiate connect
 		KtnDatagram packet = this.constructInternalPacket(Flag.SYN);
-		packet.setDest_addr(this.remoteAddress);
-		packet.setDest_port(this.remotePort);
-		// packet.setPayload("dummy");
+		packet.setPayload("dummy");
 
 		try {
 			this.simplySendPacket(packet);
@@ -107,30 +106,15 @@ public class ConnectionImpl extends AbstractConnection {
 		this.state = State.SYN_SENT;
 
 		// Look for SYNACK
-		KtnDatagram rcv_packet = this.receiveAck();
+		while ((null == packet) || (packet.getFlag() != Flag.SYN_ACK)) {
+			packet = this.receiveAck();
+		}
+		// Have SYNACK, send ACK
+		this.remoteAddress = packet.getSrc_addr();
+		this.remotePort = packet.getSrc_port();
+		this.sendAck(packet, false);
 
-		System.out.println("connect_rcv: ");
-		System.out.println(rcv_packet);
-
-		if (rcv_packet.getFlag() != Flag.SYN_ACK)
-			throw new IOException("No SYN_ACK recieved");
-
-		System.out.println(rcv_packet.toString());
-
-		System.out.println("connect() RCV: "
-				+ rcv_packet.getPayload().toString());
-
-		if (this.lastValidPacketReceived.getFlag() == Flag.SYN)
-			this.state = state.SYN_RCVD;
-		this.sendAck(this.lastValidPacketReceived, true);
-
-		// Log.writeToLog("SYN sent, state=SYN_SENT", "connect()");
-		return;
-
-		// Start timer, wait for SYNACK
-		// howto?
-
-		// throw new NotImplementedException();
+		this.state = State.ESTABLISHED;
 	}
 
 	/**
@@ -140,36 +124,46 @@ public class ConnectionImpl extends AbstractConnection {
 	 * @see Connection#accept()
 	 */
 	public Connection accept() throws IOException, SocketTimeoutException {
-		
+
 		System.out.println("accept()");
 		System.out.println(this.lastValidPacketReceived);
-		
-		
-		
+
+		KtnDatagram packet = null;
 		this.state = State.LISTEN;
-		KtnDatagram packet = this.receivePacket(false);
-		//System.out.println("server: " + packet);
-		
-		
-		
-		
+		while ((null == packet) || (packet.getFlag() != Flag.SYN)) {
+			packet = this.receivePacket(true);
+		}
+		Log.writeToLog(packet, "null", "crap");
+
+		System.out.println("serverASDF: ");
+		System.out.println(packet);
+
+		this.state = State.SYN_RCVD;
+
 		this.remoteAddress = packet.getSrc_addr();
 		this.remotePort = packet.getSrc_port();
+
+		int myport = 50000;
+		while (this.usedPorts.containsKey(myport))
+			myport = (int) (50000 + 1000 * Math.random());
+
+		this.usedPorts.keySet(myport,true);
 		
 		
-		
-		KtnDatagram synack = new KtnDatagram();
-		synack.setFlag(Flag.SYN_ACK);
-		synack.setDest_addr(this.remoteAddress);
-		synack.setDest_port(this.remotePort);
-		
-		System.out.println(synack);
-		this.sendAck(synack, true);
-		
-		
-		
-		
-		return this;
+		ConnectionImpl connection = new ConnectionImpl(myport);
+		connection.remoteAddress = packet.getSrc_addr();
+		connection.remotePort = packet.getSrc_port();
+		connection.usedPorts = this.usedPorts;
+		connection.sendAck(packet, true);
+
+		// Wait for ACK
+		while (null == packet || (packet.getFlag() != Flag.ACK)) {
+			packet = this.receiveAck();
+		}
+
+		this.state = State.ESTABLISHED;
+
+		return connection;
 
 	}
 
