@@ -100,7 +100,8 @@ public class ConnectionImpl extends AbstractConnection {
  		}
  		catch (Exception e) {
 			// TODO: handle exception
- 			System.out.println("ERRRRRROR!");		
+ 			
+ 			System.out.println("connect() error: " + e.getMessage());		
  			}
 		this.state = State.SYN_SENT;
 		
