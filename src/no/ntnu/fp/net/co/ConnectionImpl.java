@@ -43,9 +43,6 @@ public class ConnectionImpl extends AbstractConnection {
 	private static Map<Integer, Boolean> usedPorts = Collections
 			.synchronizedMap(new HashMap<Integer, Boolean>());
 
-	// Dirty hack
-	private InetAddress myInetAddress;
-
 	/**
 	 * Initialise initial sequence number and setup state machine.
 	 * 
@@ -82,18 +79,14 @@ public class ConnectionImpl extends AbstractConnection {
 	public void connect(InetAddress remoteAddress, int remotePort)
 			throws IOException, SocketTimeoutException {
 
-		// this.remoteAddress = remoteAddress.getHostAddress();
-		// Log.writeToLog("Setting remote address to:" + this.remoteAddress,
-		// "connect()");
-		// this.remotePort = remotePort;
-		// Log.writeToLog("Setting remote port to: " + remotePort, "connect()");
-
+		 this.remoteAddress = remoteAddress.getHostAddress();
+		 this.remotePort = remotePort;
+		
 		// Check if we're connected already
 		if (state.ESTABLISHED == this.state) {
 			Log.writeToLog("Already connected!", "connect()");
 			return;
 		}
-
 		
 		// Send SYN to initate connect
 		KtnDatagram packet = this.constructInternalPacket(Flag.SYN);
@@ -103,13 +96,13 @@ public class ConnectionImpl extends AbstractConnection {
 		
 		ClSocket clsocket = new ClSocket();
  		try {
-		clsocket.send(packet);		//Send the packet
+ 			clsocket.send(packet);		//Send the packet
  		}
  		catch (Exception e) {
 			// TODO: handle exception
-		}
+ 			System.out.println("ERRRRRROR!");		
+ 			}
 		this.state = State.SYN_SENT;
-
 		
 		// Look for SYNACK
 		ClSocket socket = new ClSocket();
@@ -171,8 +164,10 @@ public class ConnectionImpl extends AbstractConnection {
 	public String receive() throws ConnectException, IOException {
 
 		System.out.println("Recieve runs");
-		KtnDatagram ktnmessage = this.lastValidPacketReceived;
+		KtnDatagram ktnmessage = null;
 
+		
+		
 		String message = ktnmessage.toString();
 
 		System.out.println(message);
