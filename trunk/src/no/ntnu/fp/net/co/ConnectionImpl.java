@@ -154,6 +154,11 @@ public class ConnectionImpl extends AbstractConnection {
 		// throw new NotImplementedException();
 	}
 		//send pakke
+		KtnDatagram packet = this.constructInternalPacket(Flag.SYN);
+		packet.setDest_addr(this.remoteAddress);
+		packet.setDest_port(this.remotePort);
+		packet.setPayload("dummy");
+		
 		ClSocket clSocket=new ClSocket();
 		try{
 			clSocket.send(packet);
@@ -162,6 +167,7 @@ public class ConnectionImpl extends AbstractConnection {
 			
 			
 		}
+		
 	/**
 	 * Wait for incoming data.
 	 * 
