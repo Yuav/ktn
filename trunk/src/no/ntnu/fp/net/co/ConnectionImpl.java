@@ -94,11 +94,28 @@ public class ConnectionImpl extends AbstractConnection {
 			return;
 		}
 
-		KtnDatagram my_ktnpackage = this.constructInternalPacket(Flag.SYN);
-//this.sendAck(packetToAck, synAck)
-		this.sendDataPacketWithRetransmit(my_ktnpackage);
+		
+		// Send SYN to initate connect
+		KtnDatagram packet = this.constructInternalPacket(Flag.SYN);
+		packet.setDest_addr(this.remoteAddress);
+		packet.setDest_port(this.remotePort);
+		packet.setPayload("dummy");
+		
+		ClSocket clsocket = new ClSocket();
+ 		try {
+		clsocket.send(packet);		//Send the packet
+ 		}
+ 		catch (Exception e) {
+			// TODO: handle exception
+		}
 		this.state = State.SYN_SENT;
 
+		
+		// Look for SYNACK
+		ClSocket socket = new ClSocket();
+		KtnDatagram rcv_packet = socket.receive(this.myPort);
+		System.out.println(rcv_packet.getPayload().toString());
+		
 		if (this.lastValidPacketReceived.getFlag() == Flag.SYN)
 			this.state = state.SYN_RCVD;
 			this.sendAck(this.lastValidPacketReceived, true);
