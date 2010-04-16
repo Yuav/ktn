@@ -107,6 +107,7 @@ public class ConnectionImpl extends AbstractConnection {
 		
 		// Look for SYNACK
 		KtnDatagram rcv_packet = this.receiveAck();
+		
 		if (rcv_packet.getFlag() != Flag.SYN_ACK) throw new IOException("No SYN_ACK recieved");
 		
 		
