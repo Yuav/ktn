@@ -217,6 +217,26 @@ public class ConnectionImpl extends AbstractConnection {
 	 * @return true if packet is free of errors, false otherwise.
 	 */
 	protected boolean isValid(KtnDatagram packet) {
-		throw new NotImplementedException();
+		boolean valid = true;
+		// Sjekker om checksum er korrekt
+		if (packet.getChecksum() != packet.calculateChecksum()) valid = false;
+		
+		// Sjekker om pakken kommer fra rett IP
+		if (packet.getSrc_addr().equals(this.remoteAddress)) valid = false;
+		
+		// Sjekker om pakken kommer fra rett port
+		if (packet.getSrc_port() != this.remotePort) valid = false;
+		
+		// Sjekker om pakken har rett flagg
+		if (!(packet.getFlag() == Flag.NONE || packet.getFlag() == Flag.ACK)) valid = false;
+		
+		// Sjekker om pakken har rett sekvensnr.
+		if (packet.getSeq_nr() != (lastValidPacketReceived.getSeq_nr()+1)) valid = false;
+		
+		// Skriver til log
+		if(valid) Log.writeToLog(packet, "Valid package", "isValid(KtnDatagram)");
+		else Log.writeToLog(packet, "Invalid package", "isValid(KtnDatagram");
+		
+		return valid;
 	}
 }
