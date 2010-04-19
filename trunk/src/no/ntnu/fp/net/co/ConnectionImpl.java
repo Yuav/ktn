@@ -109,6 +109,8 @@ public class ConnectionImpl extends AbstractConnection {
 
 		// Look for SYNACK
 		packet = this.receiveAck();
+		// while ((packet != null) || (packet.getFlag() != Flag.SYN_ACK)) {
+		// }
 		this.remotePort = packet.getSrc_port();
 		Log.writeToLog(packet, "SYNACK recieved", "Connect()");
 
@@ -176,9 +178,9 @@ public class ConnectionImpl extends AbstractConnection {
 		Log.writeToLog(packet, "SYN_ACK sent", "accept()");
 
 		// Wait for ACK
-		while ((packet != null) && (packet.getFlag() != Flag.ACK)) {
-			packet = connection.receiveAck();
-		}
+		// while ((packet != null) || (packet.getFlag() != Flag.ACK)) {
+		// }
+		packet = connection.receiveAck();
 		Log.writeToLog(packet, "ACK for SYN_ACK recieved", "accept()");
 
 		connection.state = State.ESTABLISHED;
