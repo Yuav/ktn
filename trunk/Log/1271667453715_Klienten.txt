@@ -1,0 +1,23 @@
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Timestamp        Logging Entity           Source                   Destination              Seq No  Flag    Ack No  Start Payload            Checksum    Comment                                           
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+10:57:33.793     ConnectionImpl(int)                                                                                                                     Setting port: 5555                                
+10:57:33.808     getIPv4Address()                                                                                                                        Setting IP: 129.241.206.71                        
+10:57:34.27      NETWORK                                                                                                                                 Packet 3428 send!                                 
+10:57:34.43      Connect()                129.241.206.71:5555      127.0.0.1:10500          3428    SYN     -1                               0           SYN sendt                                         
+10:57:34.43      AbstractConnection                                                                                                                      Waiting for incoming packet in receiveAck()       
+10:57:34.58      CLSocket::receive                                                                                                                       Receiving at:5555                                 
+10:57:34.90      CLSocket::coReceive                                                                                                                     State of socket is:
+Bound:true
+Closed: false
+Connected: true
+Local Port: 5555
+Remote Port:4814
+10:57:34.105     CLSocket::receive                                                                                                                       Finished receiving at:5555                        
+10:57:34.105     AbstractConnection                                                                                                                      Received an internal packet in receiveAck         
+10:57:34.121     Connect()                129.241.206.71:50911     129.241.206.71:5555      2805    SYN_ACK 3428                             0           SYNACK recieved                                   
+10:57:34.136     AbstractConnection       129.241.206.71:5555      127.0.0.1:50911          3429    ACK     2805                             0           Sending Ack: 2805                                 
+10:57:34.136     NETWORK                                                                                                                                 Packet 3429 send!                                 
+10:57:34.152     Connect()                129.241.206.71:50911     129.241.206.71:5555      2805    SYN_ACK 3428                             0           ACK for SYNACK sendt                              
