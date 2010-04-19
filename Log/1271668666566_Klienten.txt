@@ -1,0 +1,12 @@
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Timestamp        Logging Entity           Source                   Destination              Seq No  Flag    Ack No  Start Payload            Checksum    Comment                                           
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+11:17:46.644     ConnectionImpl(int)                                                                                                                     Setting port: 5555                                
+11:17:46.660     getIPv4Address()                                                                                                                        Setting IP: 129.241.206.71                        
+11:17:46.910     NETWORK                                                                                                                                 Packet 3328 send!                                 
+11:17:46.926     Connect()                129.241.206.71:5555      127.0.0.1:10500          3328    SYN     -1                               0           SYN sendt                                         
+11:17:46.926     AbstractConnection                                                                                                                      Waiting for incoming packet in receiveAck()       
+11:17:46.941     CLSocket::receive                                                                                                                       Receiving at:5555                                 
+11:17:46.941     ClSocketReceiver                                                                                                                        Exception while receiving: Address already in use: JVM_Bind

@@ -20,6 +20,7 @@ import java.util.Stack;
 
 import com.sun.xml.internal.ws.api.message.Packet;
 
+import sun.font.CreatedFontTracker;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import no.ntnu.fp.net.admin.Log;
@@ -119,21 +120,15 @@ public class ConnectionImpl extends AbstractConnection {
 		this.sendAck(packet, false);
 		Log.writeToLog(packet, "ACK for SYNACK sendt", "Connect()");
 
-/*		
-		int myport = (int) (50000 + 1000 * Math.random());
-		while (this.usedPorts.containsKey(myport))
-			myport = (int) (50000 + 1000 * Math.random());
-
-		// this.usedPorts.keySet(myport,true);
-		this.usedPorts.put(myport, true);
-		
-
-/*
-		ConnectionImpl connection = new ConnectionImpl(myport);
-		connection.remoteAddress = packet.getSrc_addr();
-		connection.remotePort = packet.getSrc_port();
-		connection.usedPorts = this.usedPorts;
-	*/	
+		/*
+		 * int myport = (int) (50000 + 1000 * Math.random()); while
+		 * (this.usedPorts.containsKey(myport)) myport = (int) (50000 + 1000 *
+		 * Math.random()); // this.usedPorts.keySet(myport,true);
+		 * this.usedPorts.put(myport, true); /* ConnectionImpl connection = new
+		 * ConnectionImpl(myport); connection.remoteAddress =
+		 * packet.getSrc_addr(); connection.remotePort = packet.getSrc_port();
+		 * connection.usedPorts = this.usedPorts;
+		 */
 		this.state = State.ESTABLISHED;
 		System.out.println("connect() SUCCESS!");
 	}
@@ -175,18 +170,20 @@ public class ConnectionImpl extends AbstractConnection {
 		connection.remoteAddress = packet.getSrc_addr();
 		connection.remotePort = packet.getSrc_port();
 		connection.usedPorts = this.usedPorts;
-		
+
 		// Send SYN_ACK
 		connection.sendAck(packet, true);
 		Log.writeToLog(packet, "SYN_ACK sent", "accept()");
 
 		// Wait for ACK
-		packet = connection.receiveAck();
+		while ((packet != null) && (packet.getFlag() != Flag.ACK)) {
+			packet = connection.receiveAck();
+		}
 		Log.writeToLog(packet, "ACK for SYN_ACK recieved", "accept()");
 
-		this.state = State.ESTABLISHED;
+		connection.state = State.ESTABLISHED;
 		System.out.println("accept COOOOONNNECTED!");
-		
+
 		return connection;
 
 	}
@@ -213,8 +210,14 @@ public class ConnectionImpl extends AbstractConnection {
 		packet.setDest_addr(this.remoteAddress);
 		packet.setDest_port(this.remotePort);
 
-		this.sendDataPacketWithRetransmit(packet);
-		Log.writeToLog(packet, "Sent "+msg, "send()");
+		KtnDatagram packet_rcvd = null;
+		while ((packet_rcvd != null) && (packet_rcvd.getFlag() != Flag.ACK))
+			; // TODO check if ACK is valid
+		{
+			packet_rcvd = this.sendDataPacketWithRetransmit(packet);
+		}
+		Log.writeToLog(packet_rcvd, "Send got ACK", "send()");
+		Log.writeToLog(packet, "Sent " + msg + " successfully", "send()");
 	}
 
 	/**
@@ -227,14 +230,15 @@ public class ConnectionImpl extends AbstractConnection {
 	 */
 	public String receive() throws ConnectException, IOException {
 
-		Log.writeToLog("Running recieve()", "recieve()");
-		
+		Log.writeToLog("Running recieve() function", "recieve()");
+
 		KtnDatagram packet = null;
 		while ((null == packet)) {
 			packet = this.receivePacket(false);
 		}
-		
-		//TODO check that package is valid
+
+		// TODO check that package is valid
+		Log.writeToLog(packet, "from recieve", "recieve()");
 
 		System.out.println("Recieve() got: " + packet);
 
@@ -249,7 +253,62 @@ public class ConnectionImpl extends AbstractConnection {
 	 * @see Connection#close()
 	 */
 	public void close() throws IOException {
-		throw new NotImplementedException();
+		// klient sender FIN -> State.FIN_WAIT_1
+		// klient mottar ACK -> State.FIN_WAIT_2
+		// klient sender ACK og mottar FIN -> State.TIME_WAIT
+		// Vent 30s
+		// State.CLOSED
+
+		switch (state) {
+		case ESTABLISHED:
+
+			if ((this.disconnectRequest != null)
+					&& (this.disconnectRequest.getFlag() == Flag.FIN)) {
+				// Server side
+				this.sendAck(this.disconnectRequest, false);
+				this.state = State.CLOSE_WAIT;
+				KtnDatagram packet = this.constructInternalPacket(Flag.FIN);
+				try {
+					this.simplySendPacket(packet);
+					Log.writeToLog(packet, "FIN sendt from server", "Close()");
+				} catch (Exception e) {
+					throw new IOException(e.getMessage());
+					// System.out.println("connect() error: " + e.getMessage());
+				}
+				this.state = State.LAST_ACK;
+				this.receiveAck();
+				this.state = State.CLOSED;
+			} else {
+				// Client side
+
+				KtnDatagram packet = this.constructInternalPacket(Flag.FIN);
+				try {
+					this.simplySendPacket(packet);
+					Log.writeToLog(packet, "FIN sendt from client", "Close()");
+				} catch (Exception e) {
+					throw new IOException(e.getMessage());
+					// System.out.println("connect() error: " + e.getMessage());
+				}
+				this.state = State.FIN_WAIT_1;
+			}
+			break;
+		case FIN_WAIT_1:
+			this.receiveAck(); // Block until ACK recieved
+			this.state = State.FIN_WAIT_2;
+			break;
+		case FIN_WAIT_2:
+			KtnDatagram packet2 = null;
+			while ((packet2 != null) && (packet2.getFlag() != Flag.FIN)) {
+				packet2 = this.receivePacket(true);
+			}
+			this.sendAck(packet2, false);
+			this.state = State.TIME_WAIT;
+			// TODO vent 30s
+			this.state = State.CLOSED;
+			break;
+		}
+
+		// TODO fjern port fra used ports
 	}
 
 	/**
