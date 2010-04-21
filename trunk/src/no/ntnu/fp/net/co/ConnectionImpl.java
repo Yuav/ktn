@@ -108,30 +108,19 @@ public class ConnectionImpl extends AbstractConnection {
 		this.state = State.SYN_SENT;
 
 		// Look for SYNACK
-		packet = this.receiveAck();
-		// while ((packet != null) || (packet.getFlag() != Flag.SYN_ACK)) {
-		// }
+		while ((packet == null) || (packet.getFlag() != Flag.SYN_ACK)) {
+			packet = this.receiveAck();
+			System.out.println("Looking for SYN_ACK");
+		}
 		this.remotePort = packet.getSrc_port();
 		Log.writeToLog(packet, "SYNACK recieved", "Connect()");
-
-		// while ((null == packet) || (packet.getFlag() != Flag.SYN_ACK)) {
-		//	
-		// }
+		
 		// Have SYNACK, send ACK
-
 		this.sendAck(packet, false);
-		Log.writeToLog(packet, "ACK for SYNACK sendt", "Connect()");
-
-		/*
-		 * int myport = (int) (50000 + 1000 * Math.random()); while
-		 * (this.usedPorts.containsKey(myport)) myport = (int) (50000 + 1000 *
-		 * Math.random()); // this.usedPorts.keySet(myport,true);
-		 * this.usedPorts.put(myport, true); /* ConnectionImpl connection = new
-		 * ConnectionImpl(myport); connection.remoteAddress =
-		 * packet.getSrc_addr(); connection.remotePort = packet.getSrc_port();
-		 * connection.usedPorts = this.usedPorts;
-		 */
 		this.state = State.ESTABLISHED;
+		Log.writeToLog(packet, "ACK for SYNACK sendt", "Connect()");
+		
+		
 		System.out.println("connect() SUCCESS!");
 	}
 
@@ -151,23 +140,19 @@ public class ConnectionImpl extends AbstractConnection {
 		while ((null == packet) || (packet.getFlag() != Flag.SYN)) {
 			packet = this.receivePacket(true);
 		}
-		Log.writeToLog(packet, "null", "crap");
-
-		System.out.println("serverASDF: ");
-		System.out.println(packet);
-
 		this.state = State.SYN_RCVD;
 
 		this.remoteAddress = packet.getSrc_addr();
 		this.remotePort = packet.getSrc_port();
 
+
+		// Calculate new external port
 		int myport = (int) (50000 + 1000 * Math.random());
 		while (this.usedPorts.containsKey(myport))
 			myport = (int) (50000 + 1000 * Math.random());
-
-		// this.usedPorts.keySet(myport,true);
 		this.usedPorts.put(myport, true);
 
+		// Create a new connection to new client
 		ConnectionImpl connection = new ConnectionImpl(myport);
 		connection.remoteAddress = packet.getSrc_addr();
 		connection.remotePort = packet.getSrc_port();
@@ -180,8 +165,22 @@ public class ConnectionImpl extends AbstractConnection {
 		// Wait for ACK
 		// while ((packet != null) || (packet.getFlag() != Flag.ACK)) {
 		// }
-		packet = connection.receiveAck();
+		packet = connection.receiveAck(); // Should block until ack recieved
+
+		if (packet == null) {
+			// No ACK today - client port blocked?
+			connection.state = State.CLOSED;
+			String msg = "Connection attempt from " + connection.remoteAddress
+					+ ":" + connection.remotePort + " failed";
+			System.out.println(msg);
+			Log.writeToLog(msg, "accept()");
+			return connection;
+		}
+
 		Log.writeToLog(packet, "ACK for SYN_ACK recieved", "accept()");
+		Log.writeToLog(packet, "setting nextSequenceNo to:"
+				+ (packet.getSeq_nr() + 1), "accept()");
+		this.nextSequenceNo = (packet.getSeq_nr() + 1);
 
 		connection.state = State.ESTABLISHED;
 		System.out.println("accept COOOOONNNECTED!");
@@ -204,8 +203,10 @@ public class ConnectionImpl extends AbstractConnection {
 	 */
 	public void send(String msg) throws ConnectException, IOException {
 
-		if (State.ESTABLISHED != this.state)
-			throw new ConnectException();
+		if (State.ESTABLISHED != this.state) {
+			// this.connect(this.remoteAddress, this.remotePort);
+			throw new ConnectException("State is not ESTABLISHED");
+		}
 		System.out.println("sender: " + msg);
 
 		KtnDatagram packet = this.constructDataPacket(msg);
@@ -213,12 +214,13 @@ public class ConnectionImpl extends AbstractConnection {
 		packet.setDest_port(this.remotePort);
 
 		KtnDatagram packet_rcvd = null;
-		while ((packet_rcvd != null) && (packet_rcvd.getFlag() != Flag.ACK))
-			; // TODO check if ACK is valid
-		{
+		while ((packet_rcvd == null) || (packet_rcvd.getFlag() != Flag.ACK)) {
 			packet_rcvd = this.sendDataPacketWithRetransmit(packet);
 		}
+
 		Log.writeToLog(packet_rcvd, "Send got ACK", "send()");
+
+		// this.nextSequenceNo = (packet.getSeq_nr() + 1);
 		Log.writeToLog(packet, "Sent " + msg + " successfully", "send()");
 	}
 
@@ -235,11 +237,10 @@ public class ConnectionImpl extends AbstractConnection {
 		Log.writeToLog("Running recieve() function", "recieve()");
 
 		KtnDatagram packet = null;
-		while ((null == packet)) {
+		while ((null == packet) || (!this.isValid(packet))) {
 			packet = this.receivePacket(false);
 		}
 
-		// TODO check that package is valid
 		Log.writeToLog(packet, "from recieve", "recieve()");
 
 		System.out.println("Recieve() got: " + packet);
@@ -322,34 +323,49 @@ public class ConnectionImpl extends AbstractConnection {
 	 * @return true if packet is free of errors, false otherwise.
 	 */
 	protected boolean isValid(KtnDatagram packet) {
-		boolean valid = true;
+
 		// Sjekker om checksum er korrekt
-		if (packet.getChecksum() != packet.calculateChecksum())
-			valid = false;
+		if (packet.getChecksum() != packet.calculateChecksum()) {
+			Log.writeToLog(packet, "checksum invalid", "isValid()");
+			return false;
+		}
 
 		// Sjekker om pakken kommer fra rett IP
-		if (packet.getSrc_addr().equals(this.remoteAddress))
-			valid = false;
+		if (!packet.getSrc_addr().equals(this.remoteAddress)) {
+			Log.writeToLog(packet, "Invalid source ip: " + packet.getSrc_addr()
+					+ " expected: " + this.remoteAddress, "isValid()");
+			return false;
+		}
 
 		// Sjekker om pakken kommer fra rett port
-		if (packet.getSrc_port() != this.remotePort)
-			valid = false;
+		if (packet.getSrc_port() != this.remotePort) {
+			Log.writeToLog(packet, "Invalid src port: " + packet.getSrc_port()
+					+ " expected: " + this.remotePort, "isValid()");
+			return false;
+		}
 
 		// Sjekker om pakken har rett flagg
-		if (!(packet.getFlag() == Flag.NONE || packet.getFlag() == Flag.ACK))
-			valid = false;
+		if (!((packet.getFlag() == Flag.NONE) || (packet.getFlag() == Flag.ACK) || (packet
+				.getFlag() == Flag.SYN_ACK))) {
+			Log.writeToLog(packet, "Invalid flag " + packet.getFlag(),
+					"isValid()");
+			return false;
+		}
 
 		// Sjekker om pakken har rett sekvensnr.
-		if (packet.getSeq_nr() != (lastValidPacketReceived.getSeq_nr() + 1))
-			valid = false;
+		/*
+		if (packet.getSeq_nr() != this.nextSequenceNo) {
+			Log.writeToLog(packet, "Invalid seq nr: " + packet.getSeq_nr()
+					+ " expected: " + this.nextSequenceNo, "isValid()");
+			return false;
+		}
+		*
+		*/
 
-		// Skriver til log
-		if (valid)
-			Log.writeToLog(packet, "Valid package", "isValid(KtnDatagram)");
-		else
-			Log.writeToLog(packet, "Invalid package", "isValid(KtnDatagram");
-
-		return valid;
+		Log.writeToLog(packet, "Packet is valid", "isValid()");
+		
+		// All checks passed
+		return true;
 	}
 
 }
