@@ -362,11 +362,22 @@ public class ConnectionImpl extends AbstractConnection {
 		}
 
 		// Sjekker om pakken har rett sekvensnr.
-	//	if (packet.getSeq_nr() != this.nextSequenceNo) {
-	//		Log.writeToLog(packet, "Invalid seq nr: " + packet.getSeq_nr()
-	//				+ " expected: " + this.nextSequenceNo, "isValid()");
-	//		return false;
-	//	}
+		if (this.lastValidPacketReceived != null) {
+			if (packet.getSeq_nr() != this.lastDataPacketSent.getSeq_nr()) {
+				Log.writeToLog(packet, "Invalid seq nr: " + packet.getSeq_nr()
+						+ " expected: " + this.lastDataPacketSent.getSeq_nr(),
+						"isValid()");
+				return false;
+			}
+
+			// Skjekk for duplikat pakke
+
+			if (packet.equals(this.lastValidPacketReceived)) {
+				Log.writeToLog(packet, "Duplicate package detected: "
+						+ packet.getFlag(), "isValid()");
+				return false;
+			}
+		}
 
 		Log.writeToLog(packet, "Packet is valid", "isValid()");
 
