@@ -114,13 +114,12 @@ public class ConnectionImpl extends AbstractConnection {
 		}
 		this.remotePort = packet.getSrc_port();
 		Log.writeToLog(packet, "SYNACK recieved", "Connect()");
-		
+
 		// Have SYNACK, send ACK
 		this.sendAck(packet, false);
 		this.state = State.ESTABLISHED;
 		Log.writeToLog(packet, "ACK for SYNACK sendt", "Connect()");
-		
-		
+
 		System.out.println("connect() SUCCESS!");
 	}
 
@@ -145,7 +144,6 @@ public class ConnectionImpl extends AbstractConnection {
 		this.remoteAddress = packet.getSrc_addr();
 		this.remotePort = packet.getSrc_port();
 
-
 		// Calculate new external port
 		int myport = (int) (50000 + 1000 * Math.random());
 		while (this.usedPorts.containsKey(myport))
@@ -160,7 +158,7 @@ public class ConnectionImpl extends AbstractConnection {
 
 		// Send SYN_ACK
 		connection.sendAck(packet, true);
-		Log.writeToLog(packet, "SYN_ACK sent", "accept()");
+		Log.writeToLog("SYN_ACK sent", "accept()");
 
 		// Wait for ACK
 		// while ((packet != null) || (packet.getFlag() != Flag.ACK)) {
@@ -203,10 +201,11 @@ public class ConnectionImpl extends AbstractConnection {
 	 */
 	public void send(String msg) throws ConnectException, IOException {
 
-		if (State.ESTABLISHED != this.state) {
-			// this.connect(this.remoteAddress, this.remotePort);
-			throw new ConnectException("State is not ESTABLISHED");
-		}
+		/*
+		 * if (State.ESTABLISHED != this.state) {
+		 * //this.connect(this.remoteAddress, this.remotePort); throw new
+		 * ConnectException("State is not ESTABLISHED"); }
+		 */
 		System.out.println("sender: " + msg);
 
 		KtnDatagram packet = this.constructDataPacket(msg);
@@ -332,9 +331,19 @@ public class ConnectionImpl extends AbstractConnection {
 
 		// Sjekker om pakken kommer fra rett IP
 		if (!packet.getSrc_addr().equals(this.remoteAddress)) {
-			Log.writeToLog(packet, "Invalid source ip: " + packet.getSrc_addr()
-					+ " expected: " + this.remoteAddress, "isValid()");
-			return false;
+			if (this.remoteAddress.equals("127.0.0.1")) {
+				if (!packet.getSrc_addr().equals(this.myAddress)) {
+					Log.writeToLog(packet, "Invalid source ip: "
+							+ packet.getSrc_addr() + " expected: "
+							+ this.myAddress, "isValid()");
+					return false;
+				}
+			} else {
+				Log.writeToLog(packet, "Invalid source ip: "
+						+ packet.getSrc_addr() + " expected: "
+						+ this.remoteAddress, "isValid()");
+				return false;
+			}
 		}
 
 		// Sjekker om pakken kommer fra rett port
@@ -353,17 +362,14 @@ public class ConnectionImpl extends AbstractConnection {
 		}
 
 		// Sjekker om pakken har rett sekvensnr.
-		/*
-		if (packet.getSeq_nr() != this.nextSequenceNo) {
-			Log.writeToLog(packet, "Invalid seq nr: " + packet.getSeq_nr()
-					+ " expected: " + this.nextSequenceNo, "isValid()");
-			return false;
-		}
-		*
-		*/
+	//	if (packet.getSeq_nr() != this.nextSequenceNo) {
+	//		Log.writeToLog(packet, "Invalid seq nr: " + packet.getSeq_nr()
+	//				+ " expected: " + this.nextSequenceNo, "isValid()");
+	//		return false;
+	//	}
 
 		Log.writeToLog(packet, "Packet is valid", "isValid()");
-		
+
 		// All checks passed
 		return true;
 	}
