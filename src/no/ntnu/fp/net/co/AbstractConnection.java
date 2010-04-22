@@ -423,7 +423,7 @@ public abstract class AbstractConnection implements Connection {
                         if (incomingPacket.getFlag() == Flag.FIN && state == State.ESTABLISHED) {
                             // A FIN-packet has arrived in established state,
                             // stop receiving and throw and exception
-                            disconnectRequest = incomingPacket;
+                            this.disconnectRequest = incomingPacket;
                             synchronized (this) {
                                 isReceiving = false;
                                 notifyAll();
