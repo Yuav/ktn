@@ -292,13 +292,31 @@ public class ConnectionImpl extends AbstractConnection {
 					// System.out.println("connect() error: " + e.getMessage());
 				}
 				this.state = State.FIN_WAIT_1;
+				System.out.println("Heia");
+				this.receiveAck(); // Block until ACK recieved
+				this.state = State.FIN_WAIT_2;
+				System.out.println("Heia2!");
+				KtnDatagram packet2 = null;
+				while (packet2 == null) {
+					packet2 = this.receivePacket(true);
+					if (packet2!=null) 
+						if(packet2.getFlag() != Flag.FIN) break;
+					packet2=null;
+				}
+				this.sendAck(packet2, false);
+				this.state = State.TIME_WAIT;
+				// TODO vent 30s
+				this.state = State.CLOSED;
 			}
 			break;
 		case FIN_WAIT_1:
+			System.out.println("Heia");
 			this.receiveAck(); // Block until ACK recieved
 			this.state = State.FIN_WAIT_2;
+			close();
 			break;
 		case FIN_WAIT_2:
+			System.out.println("Heia2!");
 			KtnDatagram packet2 = null;
 			while ((packet2 != null) && (packet2.getFlag() != Flag.FIN)) {
 				packet2 = this.receivePacket(true);
