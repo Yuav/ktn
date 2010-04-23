@@ -63,7 +63,7 @@ public class ConnectionImpl extends AbstractConnection {
 	}
 
 	private boolean fin_recieved = false;
-private String last_package = null;
+	private String last_package = null;
 	
 	private String getIPv4Address() {
 		try {
@@ -157,7 +157,7 @@ private String last_package = null;
 		ConnectionImpl connection = new ConnectionImpl(myport);
 		connection.remoteAddress = packet.getSrc_addr();
 		connection.remotePort = packet.getSrc_port();
-		connection.usedPorts = this.usedPorts;
+//		connection.usedPorts = this.usedPorts;
 
 		// Send SYN_ACK
 		connection.sendAck(packet, true);
@@ -244,8 +244,10 @@ private String last_package = null;
 			try {
 				packet = this.receivePacket(false);
 			} catch (EOFException e) {
-				this.fin_recieved = true;
-				throw new EOFException("FIN recieved in recieve()");
+//				this.fin_recieved = true;
+				sendAck(disconnectRequest, false);
+				state = State.CLOSE_WAIT;
+				throw e;
 			}
 		} while ((null == packet) || (!this.isValid(packet)));
 
@@ -262,34 +264,31 @@ private String last_package = null;
 
 	/**
 	 * Close the connection.
+	 * @throws  
 	 * 
 	 * @see Connection#close()
 	 */
 	public void close() throws IOException {
-		// klient sender FIN -> State.FIN_WAIT_1
-		// klient mottar ACK -> State.FIN_WAIT_2
-		// klient sender ACK og mottar FIN -> State.TIME_WAIT
-		// Vent 30s
-		// State.CLOSED
+		System.out.println("closed() has been called");
+//		if (this.state != State.ESTABLISHED)
+//			throw new IOException("Cannot close() state: " + this.state);
 
-		if (this.state != State.ESTABLISHED)
-			throw new IOException("Cannot close() state: " + this.state);
+		KtnDatagram packet = null;
 
-		KtnDatagram packet = this.disconnectRequest;
-
-		if (this.fin_recieved) {
+		if (this.state == State.CLOSE_WAIT) {
 			// ############# Server side
-			Log.writeToLog(packet, "close(), last packet recieved", "close()");
-
-			if (packet.getFlag() != Flag.FIN)
-				throw new IOException("Close() called without FIN!");
-
-			Log.writeToLog(packet, "Recieved FIN, sending ACK", "close()");
-			this.sendAck(packet, false);
-
-			this.state = State.CLOSE_WAIT;
+//			Log.writeToLog(packet, "close(), last packet recieved", "close()");
+//
+//			if (packet.getFlag() != Flag.FIN && disconnectRequest==null)
+//				throw new IOException("Close() called without FIN!");
+//
+//			Log.writeToLog(packet, "Recieved FIN, sending ACK", "close()");
+//			this.sendAck(packet, false);
+//
+//			this.state = State.CLOSE_WAIT;
 			packet = this.constructInternalPacket(Flag.FIN);
 			try {
+				Thread.sleep(50);
 				this.simplySendPacket(packet);
 				Log.writeToLog(packet, "FIN sendt from server", "Close()");
 			} catch (Exception e) {
@@ -297,20 +296,22 @@ private String last_package = null;
 				// System.out.println("connect() error: " + e.getMessage());
 			}
 			this.state = State.LAST_ACK;
+			System.out.println("server current state: " + this.state);
 			
 //			CHEAT!
-			this.state = State.CLOSED;
-			if (true) return;
+			//this.state = State.CLOSED;
+			//if (true) return;
 			
 			
 			do {
 				packet = this.receiveAck();
-				System.out.println("Looking for ACK in state " + this.state);
-			} while (packet == null || (packet.getFlag() != Flag.ACK));
+				//System.out.println("Looking for ACK in state " + this.state);
+			}
+			 while (packet == null || (packet.getFlag() != Flag.ACK));
 			Log.writeToLog(packet, "Server recieved ACK for FIN", "close()");
 			this.state = State.CLOSED;
-
-		} else {
+			} 
+		if (this.state == state.ESTABLISHED){
 			// ################# Client side
 
 			// Send FIN to initiate close()
@@ -325,9 +326,15 @@ private String last_package = null;
 			}
 
 			this.state = State.FIN_WAIT_1;
-
+			System.out.println("client current state: " + this.state);
 			do {
 				System.out.println("Looking for ACK for FIN");
+				try {
+					Thread.currentThread().sleep(50);
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
 				packet = this.receiveAck(); // Block until ACK recieved
 			} while ((packet == null) || (packet.getFlag() != Flag.ACK));
 
@@ -336,11 +343,7 @@ private String last_package = null;
 							"close()");
 
 			this.state = State.FIN_WAIT_2;
-
-			//CHEAT!
-			this.state = State.CLOSED;
-			if (true) return;
-			
+			System.out.println("client current state: " + this.state);
 			
 			KtnDatagram packet2 = null;
 
@@ -352,17 +355,28 @@ private String last_package = null;
 				System.out.println("Looking for FIN in state" + this.state);
 			} while ((packet2 == null) || (packet2.getFlag() != Flag.FIN));
 
-			Log.writeToLog(packet2, "Client recieved FIN, sending ACK",
-					"close()");
-			this.sendAck(packet2, false); // Block until success
+			
+					
+			try {
+				Thread.sleep(50);
+				this.sendAck(packet2, false); // Block until success
+				Log.writeToLog(packet2, "Client recieved FIN, sending ACK","close()");
+			} catch (Exception e) {
+				throw new IOException(e.getMessage());
+				// System.out.println("connect() error: " + e.getMessage());
+			}
+			
 
 			this.state = State.TIME_WAIT;
+			System.out.println("client current state: " + this.state);
 			// TODO vent 30s
 			this.state = State.CLOSED;
+			System.out.println("client current state: " + this.state);
 
 		}
-
-		// TODO fjern port fra used ports
+		else {
+			throw new IOException("something wrong"); 
+		}
 	}
 
 	/**
